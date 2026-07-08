@@ -2,9 +2,9 @@ import os
 import pandas as pd
 from google.cloud import bigquery
 
-# ==============================================================================
+
 # CONFIGURAÇÃO DE CREDENCIAIS E AMBIENTE GCP
-# ==============================================================================
+
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "credentials.json"
 
 PROJECT_ID = "my-new-project-461718"
@@ -12,34 +12,32 @@ DATASET_ID = "Projeto_anti_fraude"
 
 client = bigquery.Client(project=PROJECT_ID)
 
-print("======= Inicializando Pipeline de Dados Imparcial (GCP) =======")
+print(" Inicializando Pipeline de Dados Imparcial (GCP)")
 
 try:
-    # ==============================================================================
-    # 1. EXTRAÇÃO DAS NOVAS COLUNAS DO BIGQUERY
-    # ==============================================================================
-    print("-> Carregando tabelas refinadas com flags de cancelamento e devolução...")
+    
+    # 1. EXTRAÇÃO DAS COLUNAS DO BIGQUERY
+    
+    print(" Carregando tabelas refinadas com flags de cancelamento e devolucao...")
     query_users = f"SELECT user_id, age, gender, state, account_created_at, is_bad_payer FROM `{PROJECT_ID}.{DATASET_ID}.refined_users`"
     df_users = client.query(query_users).to_dataframe()
 
     query_orders = f"SELECT order_id, user_id, order_timestamp, order_hour, order_hour_formatted, turno_pedido, is_cancelled, is_returned, total_order_value FROM `{PROJECT_ID}.{DATASET_ID}.refined_orders`"
     df_orders = client.query(query_orders).to_dataframe()
 
-    # ==============================================================================
-    # 2. FEATURE ENGINEERING SEM VIÉS (AGRUPADO POR USUÁRIO PARA O MODELO)
-    # ==============================================================================
-    print("-> Calculando métricas de comportamento financeiro e fricção transacional...")
+    
+    # 2. FEATURE ENGINEERING - AGRUPADO POR USUÁRIO
+   
+    print(" Calculando metricas de comportamento financeiro e friccao transacional...")
 
-    # Agrupamos o histórico total do cliente (independentemente do horário em que ocorreu)
     df_behavior_features = df_orders.groupby("user_id").agg(
         customer_lifetime_value=("total_order_value", "sum"),
         customer_ticket_medio=("total_order_value", "mean"),
-        total_cancelled_orders=("is_cancelled", "sum"),  # Nova feature neutra para o ML
-        total_returned_orders=("is_returned", "sum"),    # Nova feature neutra para o ML
+        total_cancelled_orders=("is_cancelled", "sum"),
+        total_returned_orders=("is_returned", "sum"),
         total_orders_calculated=("order_id", "count")
     ).reset_index()
 
-    # Join com a tabela de usuários
     df_final_ml = pd.merge(df_users, df_behavior_features, on="user_id", how="left")
 
     # Tratamento de nulos para garantir a matemática dos modelos
@@ -52,10 +50,9 @@ try:
     df_final_ml["customer_lifetime_value"] = df_final_ml["customer_lifetime_value"].round(2)
     df_final_ml["customer_ticket_medio"] = df_final_ml["customer_ticket_medio"].round(2)
 
-    # ==============================================================================
     # 3. BASE COMPLEMENTAR ABERTA POR PEDIDO (PARA GRÁFICOS DO POWER BI)
-    # ==============================================================================
-    print("-> Sincronizando tabelas transacionais para visões de turno do BI...")
+
+    print(" Sincronizando tabelas transacionais para visoes de turno...")
     df_orders_bi = pd.merge(
         df_orders,
         df_users[["user_id", "is_bad_payer", "account_created_at"]],
@@ -74,10 +71,10 @@ try:
         df_orders_bi["order_timestamp"] - df_orders_bi["account_created_at"]
     ).dt.days
 
-    # NOVO: agrupamento em faixas, já ordenado para o gráfico
+    # agrupamento em faixas, já ordenado para o gráfico
     def faixa_tempo_conta(dias):
         if dias < 0:
-            return "0. Inconsistente"  # segurança: compra antes da criação da conta
+            return "0. Inconsistente"  # compra antes da criação da conta
         elif dias <= 30:
             return "1. < 30 dias"
         elif dias <= 90:
@@ -89,13 +86,13 @@ try:
 
     df_orders_bi["faixa_tempo_conta"] = df_orders_bi["dias_conta_ate_compra"].apply(faixa_tempo_conta)
 
-    # ==============================================================================
-    # 4. EXPORTAÇÃO DOS DATASETS ATUALIZADOS
-    # ==============================================================================
+  
+    # 4. EXPORTAÇÃO DOS DATASETS
+
     df_final_ml.to_csv("features_modeling.csv", index=False)
     df_orders_bi.to_csv("orders_modeling.csv", index=False)
 
-    print("\n[SUCESSO] Pipeline concluído! Bases geradas com foco em Cancelamentos e Devoluções.")
+    print("\n[SUCESSO] Pipeline concluido! Bases geradas com foco em Cancelamentos e Devolucoes.")
 
 except Exception as e:
     print(f"\n[ERRO NO PIPELINE]: {e}")
