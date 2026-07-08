@@ -1,2 +1,23 @@
 # Credenciais - NUNCA subir isso pro GitHub
 credentials.json
+*credentials*.json
+*service-account*.json
+
+# Dados (arquivos pesados, não devem ir pro repositório)
+*.csv
+*.pkl
+
+# Ambiente Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+
+# Configurações de IDE
+.vscode/
+.idea/
+
+# Sistema
+.DS_Store
+Thumbs.db
