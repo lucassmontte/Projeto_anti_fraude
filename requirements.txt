@@ -3,3 +3,5 @@ google-cloud-bigquery
 db-dtypes
 scikit-learn
 joblib
+streamlit
+plotly

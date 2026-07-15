@@ -3,9 +3,10 @@ credentials.json
 *credentials*.json
 *service-account*.json
 
-# Dados (arquivos pesados, não devem ir pro repositório)
-*.csv
-*.pkl
+# Exceção: CSVs processados que o app Streamlit precisa para rodar no deploy
+# (dados fictícios/públicos, sem informação sensível)
+!orders_modeling.csv
+!features_modeling.csv
 
 # Ambiente Python
 __pycache__/
